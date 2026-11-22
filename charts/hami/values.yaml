@@ -813,6 +813,18 @@ devices:
     # A device-plugin `nodeconfig` entry can override it per node with `limitdelivery`, and a Pod with the `hami.io/limit-delivery` annotation.
     # An unknown value is ignored, and `file` is used when no valid value is set. Not applied in the `mig` operating mode.
     limitDelivery: file
+    # -- Automatically enable graphics capabilities (Vulkan, OpenGL, DXVK) for NVIDIA containers.
+    # When true, the admission webhook injects NVIDIA_DRIVER_CAPABILITIES including graphics and display,
+    # sets VK_ICD_FILENAMES to vulkanICDPath, and configures the HAMi Vulkan slicing layer.
+    # Pods can also opt in individually using the `hami.io/graphics-mode: "enabled"` annotation.
+    enableGraphics: false
+    # -- Path to the NVIDIA Vulkan ICD manifest injected into graphics containers.
+    # Empty string disables pinning and leaves ICD discovery to the container's Vulkan loader.
+    # Pinning (e.g. `/usr/share/vulkan/icd.d/nvidia_icd.json`) is useful on hybrid GPU hosts (e.g. laptops with Intel/AMD iGPU and NVIDIA dGPU).
+    vulkanICDPath: ""
+    # -- Route OpenGL applications through Mesa Zink to run on top of Vulkan.
+    # Sets MESA_LOADER_DRIVER_OVERRIDE=zink in graphics containers so OpenGL allocations funnel into the Vulkan slicing layer.
+    enableZink: false
   remotegpu:
     # -- Schedule Pods onto GPUs served over the network by a lupine server.
     # Mark lupine nodes with operatingmode: remote in devicePlugin.nodeConfiguration

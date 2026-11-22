@@ -2729,6 +2729,45 @@ func TestMutateAdmission_RuntimeClassName(t *testing.T) {
 	assert.Equal(t, *pod.Spec.RuntimeClassName, "nvidia")
 }
 
+func TestMutateAdmission_GraphicsMode(t *testing.T) {
+	dev := &NvidiaGPUDevices{
+		config: NvidiaConfig{
+			ResourceCountName:            "nvidia.com/gpu",
+			ResourceMemoryName:           "nvidia.com/gpumem",
+			ResourceCoreName:             "nvidia.com/gpucores",
+			ResourceMemoryPercentageName: "nvidia.com/gpumem-percentage",
+			DefaultGPUNum:                1,
+			EnableGraphics:               true,
+			VulkanICDPath:                "/usr/share/vulkan/icd.d/nvidia_icd.json",
+			EnableZink:                   true,
+		},
+	}
+	ctr := &corev1.Container{
+		Resources: corev1.ResourceRequirements{
+			Limits: corev1.ResourceList{
+				"nvidia.com/gpu": *resource.NewQuantity(1, resource.BinarySI),
+			},
+		},
+	}
+	pod := &corev1.Pod{}
+	got, err := dev.MutateAdmission(ctr, pod)
+	assert.NilError(t, err)
+	assert.Equal(t, got, true)
+
+	envMap := make(map[string]string)
+	for _, env := range ctr.Env {
+		envMap[env.Name] = env.Value
+	}
+
+	assert.Equal(t, envMap["NVIDIA_DRIVER_CAPABILITIES"], "compute,compat32,graphics,utility,video,display")
+	assert.Equal(t, envMap["VK_ICD_FILENAMES"], "/usr/share/vulkan/icd.d/nvidia_icd.json")
+	assert.Equal(t, envMap["MESA_LOADER_DRIVER_OVERRIDE"], "zink")
+	assert.Equal(t, envMap["__GLX_VENDOR_LIBRARY_NAME"], "mesa")
+	assert.Equal(t, envMap["HAMI_GRAPHICS_MODE"], "enabled")
+	_, hasLayerPath := envMap["VK_LAYER_PATH"]
+	assert.Assert(t, !hasLayerPath)
+}
+
 func TestMutateAdmission_OverwriteEnv(t *testing.T) {
 	dev := &NvidiaGPUDevices{
 		config: NvidiaConfig{

@@ -145,6 +145,12 @@ type NvidiaConfig struct {
 	GPUCorePolicy GPUCoreUtilizationPolicy `yaml:"gpuCorePolicy"`
 	// RuntimeClassName is the name of the runtime class to be added to pod.spec.runtimeClassName
 	RuntimeClassName string `yaml:"runtimeClassName"`
+	// EnableGraphics automatically enables graphics driver capabilities and Vulkan layer
+	EnableGraphics bool `yaml:"enableGraphics"`
+	// VulkanICDPath is the path to NVIDIA Vulkan ICD manifest injected into graphics containers
+	VulkanICDPath string `yaml:"vulkanICDPath"`
+	// EnableZink forces OpenGL applications through Mesa Zink to run on Vulkan
+	EnableZink bool `yaml:"enableZink"`
 }
 
 // These configs can be specified for each node by using Nodeconfig.
@@ -455,6 +461,7 @@ func (dev *NvidiaGPUDevices) MutateAdmission(ctr *corev1.Container, p *corev1.Po
 		if p.Spec.RuntimeClassName == nil && dev.config.RuntimeClassName != "" {
 			p.Spec.RuntimeClassName = &dev.config.RuntimeClassName
 		}
+		dev.mutateGraphicsAdmission(ctr, p)
 	}
 
 	if !hasResource {
@@ -489,6 +496,14 @@ func hasEnvVarWithValue(env []corev1.EnvVar, name, value string) bool {
 		return e.ValueFrom == nil && e.Value == value
 	}
 	return false
+}
+
+func (dev *NvidiaGPUDevices) mutateGraphicsAdmission(ctr *corev1.Container, p *corev1.Pod) {
+	ApplyGraphicsEnv(ctr, p.Annotations, GraphicsConfig{
+		Enable:        dev.config.EnableGraphics,
+		VulkanICDPath: dev.config.VulkanICDPath,
+		EnableZink:    dev.config.EnableZink,
+	})
 }
 
 func (dev *NvidiaGPUDevices) validateMemoryPercentage(ctr *corev1.Container) error {

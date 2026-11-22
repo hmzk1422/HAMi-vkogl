@@ -1561,6 +1561,34 @@ func (plugin *NvidiaDevicePlugin) Allocate(ctx context.Context, reqs *kubeletdev
 						HostPath: cacheFileHostDirectory,
 						ReadOnly: false},
 				)
+				if nvidia.GraphicsRequested(plugin.schedulerConfig.EnableGraphics, current.Annotations) {
+					// Fail closed: never hand out an un-enforced GPU to a graphics pod.
+					if err := nvidia.CheckVulkanLayerInstalled(hostHookPath); err != nil {
+						PodAllocationFailed(nodename, current, NodeLockNvidia)
+						return &kubeletdevicepluginv1beta1.AllocateResponse{}, err
+					}
+					for _, m := range nvidia.VulkanLayerMounts(hostHookPath) {
+						response.Mounts = append(response.Mounts, &kubeletdevicepluginv1beta1.Mount{
+							ContainerPath: m.ContainerPath,
+							HostPath:      m.HostPath,
+							ReadOnly:      m.ReadOnly,
+						})
+					}
+					uuids := make([]string, 0, len(devreq))
+					memMB := make([]int64, 0, len(devreq))
+					for _, d := range devreq {
+						uuids = append(uuids, d.UUID)
+						memMB = append(memMB, int64(d.Usedmem))
+					}
+					envs, err := nvidia.VulkanAllocationEnvs(uuids, memMB)
+					if err != nil {
+						PodAllocationFailed(nodename, current, NodeLockNvidia)
+						return &kubeletdevicepluginv1beta1.AllocateResponse{}, err
+					}
+					for k, v := range envs {
+						response.Envs[k] = v
+					}
+				}
 				configureHostPIDLockParentMount(response)
 				configureHostPIDBroker(response)
 				if resolveLimitDelivery(current, plugin.schedulerConfig.LimitDelivery) == nvidia.LimitDeliveryFile {
