@@ -1,0 +1,24 @@
+# In-cluster proof: a 4 GB slice must look like a 4 GB GPU and refuse the 5th GB.
+# Build: docker build -f deploy/Dockerfile.proof -t <registry>/hami-vk-proof .
+apiVersion: v1
+kind: Pod
+metadata:
+  name: vk-proof-4g
+  annotations:
+    hami.io/graphics-mode: "enabled"
+spec:
+  restartPolicy: Never
+  containers:
+  - name: probe
+    image: <registry>/hami-vk-proof
+    command: ["/bin/sh","-c"]
+    args:
+    - |
+      echo "== what the container sees =="; vkmem_test info
+      echo "== allocate 256 MB chunks until refused =="; HAMI_VK_LOG=1 vkmem_test fill 256
+    resources:
+      limits:
+        nvidia.com/gpu: 1
+        nvidia.com/gpumem: 4096
+# EXPECT: heap = 4096 MB (NOT the physical 24/48 GB), "allocated 16 x 256 MB = 4096 MB ... OUT_OF_DEVICE_MEMORY".
+# Then launch TWO such pods on the same GPU and run `nvidia-smi` on the node: each should top out near 4 GB.

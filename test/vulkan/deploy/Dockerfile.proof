@@ -1,0 +1,5 @@
+# Throwaway image for the in-cluster proof. Needs the NVIDIA runtime to inject the Vulkan ICD.
+FROM nvidia/cuda:12.4.1-base-ubuntu22.04
+RUN apt-get update && apt-get install -y --no-install-recommends gcc libc6-dev libvulkan-dev libvulkan1 vulkan-tools && rm -rf /var/lib/apt/lists/*
+COPY test/vkmem_test.c /tmp/
+RUN gcc -O1 /tmp/vkmem_test.c -o /usr/local/bin/vkmem_test -lvulkan

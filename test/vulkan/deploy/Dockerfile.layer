@@ -1,0 +1,10 @@
+# Build stage for the layer; COPY /out into the HAMi device-plugin image at /k8s-vgpu/lib/vulkan
+# and call deploy/install-layer.sh from the plugin entrypoint.
+FROM ubuntu:22.04 AS build
+RUN apt-get update && apt-get install -y --no-install-recommends gcc make libc6-dev libvulkan-dev && rm -rf /var/lib/apt/lists/*
+WORKDIR /src
+COPY layer/ .
+RUN make && mkdir -p /out && cp libVkLayer_hami_vgpu.so hami_vk_layer.json /out/
+# Build on the OLDEST distro you deploy to (glibc compatibility): the .so loads inside arbitrary game images.
+FROM scratch AS out
+COPY --from=build /out /
