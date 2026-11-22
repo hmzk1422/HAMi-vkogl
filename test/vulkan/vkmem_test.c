@@ -15,8 +15,28 @@ static void setup(void) {
     VkApplicationInfo app = { .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO, .apiVersion = VK_API_VERSION_1_1 };
     VkInstanceCreateInfo ici = { .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO, .pApplicationInfo = &app };
     CHECK(vkCreateInstance(&ici, NULL, &inst));
-    uint32_t n = 1; VkResult r = vkEnumeratePhysicalDevices(inst, &n, &phys);
-    if (r != VK_SUCCESS && r != VK_INCOMPLETE) { printf("no device\n"); exit(2); }
+    uint32_t count = 0;
+    vkEnumeratePhysicalDevices(inst, &count, NULL);
+    printf("Found %u physical Vulkan device(s):\n", count);
+    if (count == 0) { printf("no device\n"); exit(2); }
+    VkPhysicalDevice *devices = malloc(sizeof(VkPhysicalDevice) * count);
+    CHECK(vkEnumeratePhysicalDevices(inst, &count, devices));
+    int chosen = 0;
+    for (uint32_t i = 0; i < count; i++) {
+        VkPhysicalDeviceProperties p;
+        vkGetPhysicalDeviceProperties(devices[i], &p);
+        printf("  [%u] %s (type=%u, vendor=0x%04x)\n", i, p.deviceName, p.deviceType, p.vendorID);
+        // Prefer discrete or integrated GPU over CPU (type 4 = CPU)
+        if (p.deviceType != VK_PHYSICAL_DEVICE_TYPE_CPU && chosen == 0) {
+            chosen = i;
+        }
+    }
+    phys = devices[chosen];
+    VkPhysicalDeviceProperties chosen_p;
+    vkGetPhysicalDeviceProperties(phys, &chosen_p);
+    printf("Selected device [%d]: %s\n", chosen, chosen_p.deviceName);
+    free(devices);
+
     float prio = 1;
     VkDeviceQueueCreateInfo q = { .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO, .queueFamilyIndex = 0, .queueCount = 1, .pQueuePriorities = &prio };
     VkDeviceCreateInfo dci = { .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO, .queueCreateInfoCount = 1, .pQueueCreateInfos = &q };
@@ -24,6 +44,9 @@ static void setup(void) {
 }
 
 static void info(void) {
+    VkPhysicalDeviceProperties props; vkGetPhysicalDeviceProperties(phys, &props);
+    printf("device_name=%s (type=%u)\n", props.deviceName, props.deviceType);
+
     VkPhysicalDeviceIDProperties id = { .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES };
     VkPhysicalDeviceProperties2 p2 = { .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2, .pNext = &id };
     vkGetPhysicalDeviceProperties2(phys, &p2);
